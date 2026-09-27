@@ -6,11 +6,11 @@
   "packageManager": "pnpm@11.25.0",
   "scripts": {
     "analyze:classic": "pnpm build && node tools/analyze-classic.mjs",
-    "build": "pnpm --filter @orange-ludo/game-core build",
+    "build": "pnpm --filter @orange-ludo/game-core build && pnpm --filter @orange-ludo/client-model build",
     "check": "pnpm typecheck && pnpm test",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "pnpm --filter @orange-ludo/game-core typecheck"
+    "typecheck": "pnpm --filter @orange-ludo/game-core build && pnpm --filter @orange-ludo/client-model typecheck"
   },
   "devDependencies": {
     "typescript": "^5.9.2",
