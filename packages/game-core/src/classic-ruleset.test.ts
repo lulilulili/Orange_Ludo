@@ -129,5 +129,11 @@ function piece(
   zone: PieceState["zone"],
   distanceToFinish: number,
 ): PieceState {
-  return { id, ownerId: "orange", zone, distanceToFinish };
+  return {
+    id,
+    ownerId: "orange",
+    zone,
+    routeIndex: zone === "base" ? null : 0,
+    distanceToFinish,
+  };
 }

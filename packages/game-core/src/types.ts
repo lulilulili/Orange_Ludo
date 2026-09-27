@@ -7,6 +7,8 @@ export interface PieceState {
   readonly id: PieceId;
   readonly ownerId: PlayerId;
   readonly zone: PieceZone;
+  /** Index in the owner's configured route, or null while at base. */
+  readonly routeIndex: number | null;
   /** Remaining forward steps along the configured route. */
   readonly distanceToFinish: number;
 }
