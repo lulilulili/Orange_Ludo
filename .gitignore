@@ -1,0 +1,22 @@
+node_modules/
+dist/
+coverage/
+tmp/
+.idea/
+.vscode/
+*.log
+.DS_Store
+Thumbs.db
+
+# Cocos Creator generated directories
+apps/client/library/
+apps/client/local/
+apps/client/temp/
+apps/client/build/
+apps/client/profiles/
+
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example
+project.private.config.json
