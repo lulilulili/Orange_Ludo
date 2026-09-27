@@ -1,8 +1,10 @@
 import {
   getPlayerRoute,
   getRouteNode,
+  getSpecialMove,
   type BoardDefinition,
   type BoardNodeId,
+  type SpecialMoveDefinition,
 } from "./board.js";
 import {
   getActivePlayer,
@@ -193,6 +195,17 @@ export function applyPieceSelection(
   nextState = collisionResult.state;
   events.push(...collisionResult.events);
 
+  if (movedPiece.zone === "track") {
+    const specialResult = resolveSpecialLanding(
+      nextState,
+      movedPiece,
+      board,
+      ruleset,
+    );
+    nextState = specialResult.state;
+    events.push(...specialResult.events);
+  }
+
   if (ruleset.victory.hasWon(nextState, playerId)) {
     events.push({ type: "game-ended", winnerId: playerId });
     return {
@@ -359,6 +372,210 @@ function resolveLandingCollisions(
   return { state: nextState, events };
 }
 
+function resolveSpecialLanding(
+  state: ClassicGameState,
+  movedPiece: PieceState,
+  board: BoardDefinition,
+  ruleset: ClassicRuleset,
+): GameTransition {
+  const startNodeId = getPieceNodeId(movedPiece, board);
+  if (!startNodeId) return { state, events: [] };
+
+  const directFlight = getSpecialMove(
+    board,
+    movedPiece.ownerId,
+    startNodeId,
+    "flight",
+  );
+  if (directFlight) {
+    const flightResult = applySpecialMove(
+      state,
+      movedPiece,
+      directFlight,
+      board,
+      ruleset,
+    );
+    if (!flightResult.taken) return flightResult.transition;
+
+    const afterFlight = findPieceByOwner(
+      flightResult.transition.state,
+      movedPiece.ownerId,
+      movedPiece.id,
+    );
+    const jumpAfterFlight = getSpecialMove(
+      board,
+      movedPiece.ownerId,
+      directFlight.toNodeId,
+      "color-jump",
+    );
+    if (!jumpAfterFlight) return flightResult.transition;
+
+    const jumpResult = applySpecialMove(
+      flightResult.transition.state,
+      afterFlight,
+      jumpAfterFlight,
+      board,
+      ruleset,
+    );
+    return {
+      state: jumpResult.transition.state,
+      events: [
+        ...flightResult.transition.events,
+        ...jumpResult.transition.events,
+      ],
+    };
+  }
+
+  const colorJump = getSpecialMove(
+    board,
+    movedPiece.ownerId,
+    startNodeId,
+    "color-jump",
+  );
+  if (!colorJump) return { state, events: [] };
+
+  const jumpResult = applySpecialMove(
+    state,
+    movedPiece,
+    colorJump,
+    board,
+    ruleset,
+  );
+  if (!jumpResult.taken) return jumpResult.transition;
+
+  // A color jump may land on the flight entry. It flies across the board but
+  // does not receive a second color jump afterwards.
+  const flightAfterJump = getSpecialMove(
+    board,
+    movedPiece.ownerId,
+    colorJump.toNodeId,
+    "flight",
+  );
+  if (!flightAfterJump) return jumpResult.transition;
+
+  const afterJump = findPieceByOwner(
+    jumpResult.transition.state,
+    movedPiece.ownerId,
+    movedPiece.id,
+  );
+  const flightResult = applySpecialMove(
+    jumpResult.transition.state,
+    afterJump,
+    flightAfterJump,
+    board,
+    ruleset,
+  );
+  return {
+    state: flightResult.transition.state,
+    events: [
+      ...jumpResult.transition.events,
+      ...flightResult.transition.events,
+    ],
+  };
+}
+
+function applySpecialMove(
+  state: ClassicGameState,
+  piece: PieceState,
+  move: SpecialMoveDefinition,
+  board: BoardDefinition,
+  ruleset: ClassicRuleset,
+): { readonly taken: boolean; readonly transition: GameTransition } {
+  if (ruleset.config.stacksBlockMovement) {
+    const blockingNodeId = [...move.viaNodeIds, move.toNodeId].find((nodeId) =>
+      isOpponentBlockade(state, piece.ownerId, nodeId, board),
+    );
+    if (blockingNodeId) {
+      return {
+        taken: false,
+        transition: {
+          state,
+          events: [
+            {
+              type: "special-move-blocked",
+              playerId: piece.ownerId,
+              pieceId: piece.id,
+              kind: move.kind,
+              fromNodeId: move.fromNodeId,
+              blockingNodeId,
+            },
+          ],
+        },
+      };
+    }
+  }
+
+  const route = getPlayerRoute(board, piece.ownerId);
+  const destinationIndex = route.nodeIds.indexOf(move.toNodeId);
+  if (destinationIndex < 0) {
+    throw new Error(`Special move destination is outside ${piece.ownerId}'s route.`);
+  }
+
+  let nextState = updatePiece(state, piece.ownerId, piece.id, () =>
+    pieceAtRouteIndex(piece, destinationIndex, board),
+  );
+  const events: GameEvent[] = [
+    {
+      type: "special-move-taken",
+      playerId: piece.ownerId,
+      pieceId: piece.id,
+      kind: move.kind,
+      fromNodeId: move.fromNodeId,
+      toNodeId: move.toNodeId,
+      viaNodeIds: move.viaNodeIds,
+    },
+  ];
+
+  for (const nodeId of move.viaNodeIds) {
+    const collision = resolveNodeCollisions(
+      nextState,
+      piece.ownerId,
+      nodeId,
+      board,
+    );
+    nextState = collision.state;
+    events.push(...collision.events);
+  }
+
+  const movedPiece = findPieceByOwner(nextState, piece.ownerId, piece.id);
+  const landingCollision = resolveLandingCollisions(nextState, movedPiece, board);
+  nextState = landingCollision.state;
+  events.push(...landingCollision.events);
+
+  return { taken: true, transition: { state: nextState, events } };
+}
+
+function resolveNodeCollisions(
+  state: ClassicGameState,
+  movingPlayerId: PlayerId,
+  nodeId: BoardNodeId,
+  board: BoardDefinition,
+): GameTransition {
+  const node = board.nodes[nodeId];
+  if (!node || node.safe || node.kind !== "track") {
+    return { state, events: [] };
+  }
+
+  let nextState = state;
+  const events: GameEvent[] = [];
+  for (const player of state.players) {
+    if (player.id === movingPlayerId) continue;
+    for (const piece of player.pieces) {
+      if (getPieceNodeId(piece, board) !== nodeId) continue;
+      nextState = updatePiece(nextState, player.id, piece.id, (current) =>
+        returnPieceToBase(current, board),
+      );
+      events.push({
+        type: "piece-returned-to-base",
+        playerId: player.id,
+        pieceId: piece.id,
+        reason: "collision",
+      });
+    }
+  }
+  return { state: nextState, events };
+}
+
 function getPieceNodeId(
   piece: PieceState,
   board: BoardDefinition,
@@ -452,6 +669,16 @@ function findPiece(player: PlayerState, pieceId: PieceId): PieceState {
   const piece = player.pieces.find((candidate) => candidate.id === pieceId);
   if (!piece) throw new Error(`Unknown piece: ${pieceId}`);
   return piece;
+}
+
+function findPieceByOwner(
+  state: ClassicGameState,
+  playerId: PlayerId,
+  pieceId: PieceId,
+): PieceState {
+  const player = state.players.find((candidate) => candidate.id === playerId);
+  if (!player) throw new Error(`Unknown player: ${playerId}`);
+  return findPiece(player, pieceId);
 }
 
 function assertActivePlayer(

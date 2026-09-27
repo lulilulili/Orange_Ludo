@@ -1,7 +1,12 @@
 export type PlayerId = string;
 export type PieceId = string;
 
-export type PieceZone = "base" | "track" | "home-stretch" | "finished";
+export type PieceZone =
+  | "base"
+  | "launch"
+  | "track"
+  | "home-stretch"
+  | "finished";
 
 export interface PieceState {
   readonly id: PieceId;

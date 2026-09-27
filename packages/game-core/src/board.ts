@@ -1,7 +1,8 @@
 import type { PlayerId } from "./types.js";
 
 export type BoardNodeId = string;
-export type BoardNodeKind = "track" | "home-stretch" | "finish";
+export type BoardNodeKind = "launch" | "track" | "home-stretch" | "finish";
+export type SpecialMoveKind = "color-jump" | "flight";
 
 export interface BoardNode {
   readonly id: BoardNodeId;
@@ -17,14 +18,25 @@ export interface PlayerRoute {
   readonly nodeIds: readonly BoardNodeId[];
 }
 
+export interface SpecialMoveDefinition {
+  readonly playerId: PlayerId;
+  readonly kind: SpecialMoveKind;
+  readonly fromNodeId: BoardNodeId;
+  readonly toNodeId: BoardNodeId;
+  /** Physical nodes crossed by a flight, used for collision/blockade rules. */
+  readonly viaNodeIds: readonly BoardNodeId[];
+}
+
 export interface BoardDefinition {
   readonly nodes: Readonly<Record<BoardNodeId, BoardNode>>;
   readonly routes: Readonly<Record<PlayerId, PlayerRoute>>;
+  readonly specialMoves: readonly SpecialMoveDefinition[];
 }
 
 export function createBoardDefinition(
   nodes: readonly BoardNode[],
   routes: readonly PlayerRoute[],
+  specialMoves: readonly SpecialMoveDefinition[] = [],
 ): BoardDefinition {
   const nodeRecord: Record<BoardNodeId, BoardNode> = {};
   for (const node of nodes) {
@@ -64,10 +76,53 @@ export function createBoardDefinition(
     };
   }
 
+  const specialMoveKeys = new Set<string>();
+  for (const move of specialMoves) {
+    const route = routeRecord[move.playerId];
+    if (!route) {
+      throw new Error(`Special move references unknown player: ${move.playerId}`);
+    }
+    const key = `${move.playerId}:${move.kind}:${move.fromNodeId}`;
+    if (specialMoveKeys.has(key)) {
+      throw new Error(`Duplicate special move: ${key}`);
+    }
+    specialMoveKeys.add(key);
+    for (const nodeId of [move.fromNodeId, move.toNodeId, ...move.viaNodeIds]) {
+      if (!nodeRecord[nodeId]) {
+        throw new Error(`Special move references unknown node: ${nodeId}`);
+      }
+    }
+    if (!route.nodeIds.includes(move.fromNodeId) || !route.nodeIds.includes(move.toNodeId)) {
+      throw new Error(`Special move for ${move.playerId} must stay on that player's route.`);
+    }
+  }
+
   return {
     nodes: Object.freeze(nodeRecord),
     routes: Object.freeze(routeRecord),
+    specialMoves: Object.freeze(
+      specialMoves.map((move) => ({
+        ...move,
+        viaNodeIds: Object.freeze([...move.viaNodeIds]),
+      })),
+    ),
   };
+}
+
+export function getSpecialMove(
+  board: BoardDefinition,
+  playerId: PlayerId,
+  nodeId: BoardNodeId,
+  kind: SpecialMoveKind,
+): SpecialMoveDefinition | null {
+  return (
+    board.specialMoves.find(
+      (move) =>
+        move.playerId === playerId &&
+        move.fromNodeId === nodeId &&
+        move.kind === kind,
+    ) ?? null
+  );
 }
 
 export function getPlayerRoute(

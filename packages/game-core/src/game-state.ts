@@ -1,4 +1,5 @@
 import type { BoardNodeId } from "./board.js";
+import type { SpecialMoveKind } from "./board.js";
 import type { MatchState, PieceId, PlayerId, PlayerState } from "./types.js";
 
 export type GamePhase = "awaiting-roll" | "awaiting-piece" | "ended";
@@ -38,6 +39,23 @@ export type GameEvent =
       readonly pieceId: PieceId;
       readonly blockadeNodeId: BoardNodeId;
       readonly stoppedAtNodeId: BoardNodeId;
+    }
+  | {
+      readonly type: "special-move-taken";
+      readonly playerId: PlayerId;
+      readonly pieceId: PieceId;
+      readonly kind: SpecialMoveKind;
+      readonly fromNodeId: BoardNodeId;
+      readonly toNodeId: BoardNodeId;
+      readonly viaNodeIds: readonly BoardNodeId[];
+    }
+  | {
+      readonly type: "special-move-blocked";
+      readonly playerId: PlayerId;
+      readonly pieceId: PieceId;
+      readonly kind: SpecialMoveKind;
+      readonly fromNodeId: BoardNodeId;
+      readonly blockingNodeId: BoardNodeId;
     }
   | {
       readonly type: "piece-returned-to-base";

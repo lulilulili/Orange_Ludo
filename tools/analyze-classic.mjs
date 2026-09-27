@@ -1,4 +1,5 @@
 import {
+  createBoardDefinition,
   createClassicBoard,
   createClassicRuleset,
   simulateClassicGame,
@@ -6,13 +7,25 @@ import {
 
 const gamesArgument = process.argv.find((argument) => argument.startsWith("--games="));
 const games = gamesArgument ? Number(gamesArgument.split("=")[1]) : 200;
+const shortcutsArgument = process.argv.find((argument) =>
+  argument.startsWith("--shortcuts="),
+);
+const shortcutsEnabled = shortcutsArgument
+  ? shortcutsArgument.split("=")[1] !== "false"
+  : true;
 
 if (!Number.isInteger(games) || games <= 0) {
   throw new Error("--games must be a positive whole number.");
 }
 
 const playerIds = ["red", "yellow", "blue", "green"];
-const board = createClassicBoard();
+const completeBoard = createClassicBoard();
+const board = shortcutsEnabled
+  ? completeBoard
+  : createBoardDefinition(
+      Object.values(completeBoard.nodes),
+      Object.values(completeBoard.routes),
+    );
 const ruleset = createClassicRuleset();
 const results = Array.from({ length: games }, (_, seed) =>
   simulateClassicGame({ seed, playerIds, board, ruleset }),
@@ -33,6 +46,7 @@ console.log(
   JSON.stringify(
     {
       games,
+      shortcutsEnabled,
       turns: summarize(turns),
       actions: summarize(actions),
       wins,

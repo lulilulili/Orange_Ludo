@@ -8,6 +8,10 @@ export interface ClassicBoardLayoutConfig {
   readonly homeStretchLength: number;
   readonly startOffsets: readonly [number, number, number, number];
   readonly safeTrackIndices: readonly number[];
+  /** Relative outer-track index of the cross-board flight entry. */
+  readonly flightEntryOffset: number;
+  /** Relative outer-track index reached by the flight. */
+  readonly flightExitOffset: number;
 }
 
 export const DEFAULT_CLASSIC_BOARD_LAYOUT: Readonly<ClassicBoardLayoutConfig> =
@@ -16,7 +20,9 @@ export const DEFAULT_CLASSIC_BOARD_LAYOUT: Readonly<ClassicBoardLayoutConfig> =
     outerTrackLength: 52,
     homeStretchLength: 5,
     startOffsets: Object.freeze([0, 13, 26, 39] as const),
-    safeTrackIndices: Object.freeze([0, 13, 26, 39]),
+    safeTrackIndices: Object.freeze([]),
+    flightEntryOffset: 17,
+    flightExitOffset: 29,
   });
 
 /**
@@ -44,6 +50,12 @@ export function createClassicBoard(
   );
 
   const privateNodes = config.playerIds.flatMap((playerId) => [
+    {
+      id: `${playerId}-launch`,
+      kind: "launch" as const,
+      safe: true,
+      ownerId: playerId,
+    },
     ...Array.from({ length: config.homeStretchLength }, (_, index) => ({
       id: `${playerId}-home-${index + 1}`,
       kind: "home-stretch" as const,
@@ -73,11 +85,55 @@ export function createClassicBoard(
     );
     return {
       playerId,
-      nodeIds: [...outerRoute, ...homeRoute, `${playerId}-finish`],
+      nodeIds: [
+        `${playerId}-launch`,
+        ...outerRoute,
+        ...homeRoute,
+        `${playerId}-finish`,
+      ],
     };
   });
 
-  return createBoardDefinition([...trackNodes, ...privateNodes], routes);
+  const specialMoves = config.playerIds.flatMap((playerId, playerIndex) => {
+    const startOffset = config.startOffsets[playerIndex]!;
+    const relativeColorOffsets = Array.from(
+      { length: Math.floor((config.outerTrackLength - 2) / 4) + 1 },
+      (_, index) => 1 + index * 4,
+    ).filter((offset) => offset + 4 < config.outerTrackLength);
+
+    const colorJumps = relativeColorOffsets.map((fromOffset) => ({
+      playerId,
+      kind: "color-jump" as const,
+      fromNodeId: trackNodeId(
+        (startOffset + fromOffset) % config.outerTrackLength,
+      ),
+      toNodeId: trackNodeId(
+        (startOffset + fromOffset + 4) % config.outerTrackLength,
+      ),
+      viaNodeIds: [],
+    }));
+
+    return [
+      ...colorJumps,
+      {
+        playerId,
+        kind: "flight" as const,
+        fromNodeId: trackNodeId(
+          (startOffset + config.flightEntryOffset) % config.outerTrackLength,
+        ),
+        toNodeId: trackNodeId(
+          (startOffset + config.flightExitOffset) % config.outerTrackLength,
+        ),
+        viaNodeIds: [],
+      },
+    ];
+  });
+
+  return createBoardDefinition(
+    [...trackNodes, ...privateNodes],
+    routes,
+    specialMoves,
+  );
 }
 
 function trackNodeId(index: number): string {
@@ -106,5 +162,13 @@ function validateLayout(config: ClassicBoardLayoutConfig): void {
     if (!Number.isInteger(index) || index < 0 || index >= config.outerTrackLength) {
       throw new Error(`Invalid safe track index: ${index}`);
     }
+  }
+  for (const offset of [config.flightEntryOffset, config.flightExitOffset]) {
+    if (!Number.isInteger(offset) || offset < 0 || offset >= config.outerTrackLength) {
+      throw new Error(`Invalid flight offset: ${offset}`);
+    }
+  }
+  if (config.flightExitOffset <= config.flightEntryOffset) {
+    throw new Error("Flight exit must be ahead of the flight entry.");
   }
 }
