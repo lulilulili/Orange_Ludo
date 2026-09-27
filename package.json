@@ -5,6 +5,7 @@
   "description": "A modular WeChat Mini Game implementation of classic Aeroplane Chess and future cargo modes.",
   "packageManager": "pnpm@11.25.0",
   "scripts": {
+    "analyze:classic": "pnpm build && node tools/analyze-classic.mjs",
     "build": "pnpm --filter @orange-ludo/game-core build",
     "check": "pnpm typecheck && pnpm test",
     "test": "vitest run",
