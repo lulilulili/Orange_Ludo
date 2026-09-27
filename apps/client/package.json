@@ -1,0 +1,15 @@
+{
+  "name": "@orange-ludo/client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cocos Creator 3.8.8 portrait client for Orange Ludo.",
+  "dependencies": {
+    "@orange-ludo/client-model": "workspace:*",
+    "@orange-ludo/game-core": "workspace:*",
+    "@orange-ludo/game-session": "workspace:*"
+  },
+  "creator": {
+    "version": "3.8.8"
+  },
+  "uuid": "8769727f-fd80-4fc0-aeef-648462bf757e"
+}

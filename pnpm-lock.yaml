@@ -15,6 +15,18 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7
 
+  apps/client:
+    dependencies:
+      '@orange-ludo/client-model':
+        specifier: workspace:*
+        version: link:../../packages/client-model
+      '@orange-ludo/game-core':
+        specifier: workspace:*
+        version: link:../../packages/game-core
+      '@orange-ludo/game-session':
+        specifier: workspace:*
+        version: link:../../packages/game-session
+
   packages/client-model:
     dependencies:
       '@orange-ludo/game-core':

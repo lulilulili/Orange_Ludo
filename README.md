@@ -27,7 +27,7 @@ Orange Ludo 是一款面向微信小游戏的模块化飞行棋项目。第一�
 - [x] AI 合法行动与策略选择
 - [x] 竖屏布局契约、客户端视图状态与动画队列
 - [x] 1 名玩家 + 3 名 AI 的本地对局轮转与 15 秒超时托管
-- [ ] Cocos Creator 竖屏棋盘表现层
+- [x] Cocos Creator 3.8.8 竖屏棋盘、交互、倒计时与人机对局表现层
 
 ## 工程目标
 
@@ -44,10 +44,12 @@ pnpm install
 pnpm check
 ```
 
+客户端另用 Cocos Creator 3.8.8 打开 `apps/client`；具体入口与交互见 [客户端说明](apps/client/README.md)。
+
 ## 目录
 
 ```text
-apps/client/              Cocos Creator 微信小游戏客户端（下一阶段接入）
+apps/client/              Cocos Creator 3.8.8 竖屏客户端
 apps/game-server/         联网房间服务（联网阶段接入）
 packages/game-core/       与界面无关的规则内核
 packages/client-model/    布局、可渲染状态与动画指令
