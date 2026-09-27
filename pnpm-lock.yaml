@@ -23,6 +23,12 @@ importers:
 
   packages/game-core: {}
 
+  packages/game-session:
+    dependencies:
+      '@orange-ludo/game-core':
+        specifier: workspace:*
+        version: link:../game-core
+
 packages:
 
   '@esbuild/aix-ppc64@0.28.2':
